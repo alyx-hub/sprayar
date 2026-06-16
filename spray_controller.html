@@ -86,7 +86,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
   padding: 7px 14px; border-radius: 2px; border: none; cursor: pointer;
   pointer-events: all; transition: opacity .2s; display: none; white-space: nowrap;
 }
-#save-btn.visible { display: block; }
+
 #save-btn:hover { opacity: 0.82; }
 
 /* ── RETICOLO ────────────────────────────────────────────────────── */
@@ -474,11 +474,17 @@ l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
   <div class="save-inner">
     <div class="save-eyebrow">La tua opera è pronta</div>
     <h2 class="save-title">Salva il<br>graffito</h2>
-    <div class="save-preview"><canvas id="save-canvas"></canvas></div>
+    <div class="save-preview" style="position:relative;">
+        <canvas id="save-canvas"></canvas>
+        <div id="save-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,8,8,0.5);display:none;">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(245,244,240,0.4);">Caricamento…</span>
+        </div>
+      </div>
     <div class="save-code" id="save-code">DG-2025-0001</div>
     <p class="save-sub">Vai alla pagina personale con questo codice per scaricare l'opera in alta qualità.</p>
     <div class="save-actions">
-      <a id="save-link" href="download.html" class="save-btn-primary">↓ Vai alla pagina di download</a>
+      <a id="save-link" href="#" download="digital-graffiti.png" class="save-btn-primary">↓ Scarica il graffito</a>
+      <a href="download.html" class="save-btn-primary" style="opacity:0.6;background:transparent;color:var(--white);border:0.5px solid var(--dim);" id="save-site-link">Vai alla pagina download →</a>
       <button class="save-btn-ghost" onclick="closeSaveModal()">Continua a disegnare</button>
     </div>
   </div>
@@ -547,7 +553,7 @@ l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
       calibCross.classList.remove('show');
       homographyReady = true;
       setStatus('calibrato ✓');
-      saveBtnTop.classList.add('visible');
+
       if (ws && ws.readyState === 1) {
         ws.send(JSON.stringify({ type: 'calibrated' }));
         ws.send(JSON.stringify({ type: 'calib-pattern', on: false }));
@@ -597,6 +603,21 @@ l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'bg') bgDots.forEach(d => d.classList.toggle('active', d.dataset.bg === msg.color));
+        if (msg.type === 'snapshot') {
+          // Ricevuto screenshot reale dal ledwall
+          const img = new Image();
+          img.onload = () => {
+            const sc = document.getElementById('save-canvas');
+            sc.width = 320; sc.height = 240;
+            sc.getContext('2d').drawImage(img, 0, 0, 320, 240);
+            sc.style.opacity = '1';
+            document.getElementById('save-loading').style.display = 'none';
+            // Aggiorna link download con immagine reale
+            document.getElementById('save-link').href = sc.toDataURL('image/png');
+            document.getElementById('save-link').download = `digital-graffiti-${sessionCode}.png`;
+          };
+          img.src = msg.data;
+        }
       } catch {}
     };
   }
@@ -747,29 +768,22 @@ l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
   function seededRand(seed) { let s=seed; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; }
 
   function openSaveModal() {
-    // Genera preview del graffito con il seed del codice sessione
-    const canvas = document.getElementById('save-canvas');
-    canvas.width=320; canvas.height=240;
-    const ctx=canvas.getContext('2d');
-    const seed=Array.from(sessionCode).reduce((a,c)=>a+c.charCodeAt(0),0);
-    const r=seededRand(seed);
-    ctx.fillStyle=`hsl(${Math.floor(r()*360)},${Math.floor(r()*15)}%,${Math.floor(r()*6)+3}%)`;
-    ctx.fillRect(0,0,320,240);
-    const colors=['#ff3b3b','#0a84ff','#bf5af2','#ff9f0a','#30d158','#ffd60a'];
-    for(let i=0;i<Math.floor(r()*4+3);i++){
-      const cx=r()*320,cy=r()*240,rad=r()*70+15;
-      const c=colors[Math.floor(r()*colors.length)];
-      const ri=parseInt(c.slice(1,3),16),gi=parseInt(c.slice(3,5),16),bi=parseInt(c.slice(5,7),16);
-      const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,rad);
-      grd.addColorStop(0,`rgba(${ri},${gi},${bi},${r()*0.55+0.25})`);
-      grd.addColorStop(1,`rgba(${ri},${gi},${bi},0)`);
-      ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.fillStyle=grd;ctx.fill();
-      for(let j=0;j<40;j++){const a=r()*Math.PI*2,d=r()*rad;ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,cy+Math.sin(a)*d,r()*2+0.2,0,Math.PI*2);ctx.fillStyle=`rgba(${ri},${gi},${bi},${r()*0.4+0.1})`;ctx.fill();}
+    // Richiedi snapshot reale al ledwall
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'snapshot-request' }));
+      // Mostra modal con loading
+      document.getElementById('save-canvas').getContext('2d').clearRect(0,0,320,240);
+      document.getElementById('save-code').textContent = sessionCode;
+      document.getElementById('save-link').href = `download.html?code=${sessionCode}`;
+      document.getElementById('save-modal').classList.add('open');
+      document.getElementById('save-loading').style.display = 'flex';
+      document.getElementById('save-canvas').style.opacity = '0.3';
+    } else {
+      // Fallback se WS non connesso
+      document.getElementById('save-code').textContent = sessionCode;
+      document.getElementById('save-link').href = `download.html?code=${sessionCode}`;
+      document.getElementById('save-modal').classList.add('open');
     }
-
-    document.getElementById('save-code').textContent = sessionCode;
-    document.getElementById('save-link').href = `download.html?code=${sessionCode}`;
-    document.getElementById('save-modal').classList.add('open');
   }
 
   window.openSaveModal = openSaveModal;

@@ -55,14 +55,7 @@ nav{
   position:sticky;top:57px;
   background:rgba(8,8,8,0.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:50;
 }
-.sort-tabs{display:flex;gap:2px;}
-.sort-tab{
-  font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;
-  padding:7px 14px;border:0.5px solid transparent;border-radius:2px;
-  cursor:pointer;color:rgba(245,244,240,0.35);background:transparent;transition:all .2s;
-}
-.sort-tab.active{color:var(--white);border-color:var(--dim);background:var(--dim2);}
-.sort-tab:hover:not(.active){color:rgba(245,244,240,0.65);}
+
 .view-toggle{display:flex;gap:2px;}
 .view-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:0.5px solid transparent;border-radius:2px;cursor:pointer;background:transparent;color:rgba(245,244,240,0.3);transition:all .2s;font-size:13px;}
 .view-btn.active{border-color:var(--dim);background:var(--dim2);color:var(--white);}
@@ -87,10 +80,7 @@ nav{
 .item-author{font-family:var(--mono);font-size:10px;letter-spacing:0.06em;color:var(--white);}
 .item-bottom{display:flex;align-items:center;justify-content:space-between;}
 .item-date{font-family:var(--mono);font-size:9px;color:rgba(245,244,240,0.38);}
-.item-like{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:rgba(245,244,240,0.55);cursor:pointer;background:none;border:none;padding:4px;transition:color .2s;}
-.item-like:hover,.item-like.liked{color:var(--spray);}
-.item-like svg{width:13px;height:13px;}
-.item-like.liked svg{fill:var(--spray);}
+
 
 /* MODAL */
 #modal{position:fixed;inset:0;background:rgba(8,8,8,0.94);z-index:200;display:none;align-items:center;justify-content:center;padding:28px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
@@ -104,7 +94,7 @@ nav{
 .modal-actions{display:flex;gap:8px;flex-shrink:0;}
 .modal-btn{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:9px 16px;border-radius:2px;cursor:pointer;border:0.5px solid var(--dim);background:transparent;color:rgba(245,244,240,0.55);transition:all .2s;white-space:nowrap;}
 .modal-btn:hover{border-color:rgba(245,244,240,0.38);color:var(--white);}
-.modal-btn.liked{color:var(--spray);border-color:rgba(255,59,59,0.3);}
+
 .modal-btn.dl{background:var(--white);color:var(--black);border-color:var(--white);}
 .modal-close{position:absolute;top:20px;right:20px;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(245,244,240,0.28);background:none;border:none;cursor:pointer;padding:8px;transition:color .2s;}
 .modal-close:hover{color:var(--white);}
@@ -217,10 +207,7 @@ l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
 </div>
 
 <div class="toolbar">
-  <div class="sort-tabs">
-    <button class="sort-tab active" data-sort="likes" onclick="setSort(this,'likes')">Più votati</button>
-    <button class="sort-tab" data-sort="recent" onclick="setSort(this,'recent')">Più recenti</button>
-  </div>
+  
   <div class="view-toggle">
     <button class="view-btn active" onclick="setView(this,3)" title="3 colonne">⊞</button>
     <button class="view-btn" onclick="setView(this,2)" title="2 colonne">▦</button>
@@ -240,7 +227,6 @@ l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
         <div class="modal-date" id="modal-date"></div>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn" id="modal-like-btn" onclick="toggleModalLike()">♡ <span id="modal-like-count">0</span></button>
         <button class="modal-btn dl" onclick="downloadModal()">↓ Scarica</button>
       </div>
     </div>
@@ -291,11 +277,11 @@ const nomi=['Luca','Sara','Marco','Giulia','Andrea','Valentina','Lorenzo','Chiar
 const items=Array.from({length:24},(_,i)=>{
   const r=seededRand(i*7+13);
   const d=new Date(2025,10,1+Math.floor(r()*28));
-  return {id:i,seed:i*31+7,author:`${nomi[i%nomi.length]} #${247-i}`,date:d,likes:Math.floor(r()*120)+2,liked:false};
+  return {id:i,seed:i*31+7,author:`${nomi[i%nomi.length]} #${247-i}`,date:d};
 });
 
-let displayItems=[...items].sort((a,b)=>b.likes-a.likes);
-let currentSort='likes';
+let displayItems=[...items].sort((a,b)=>b.date-a.date);
+let currentSort='recent';
 let currentModal=null;
 
 function formatDate(d){return d.toLocaleDateString('it-IT',{day:'numeric',month:'long'});}
@@ -312,18 +298,10 @@ function renderGrid(){
     overlay.className='item-overlay';
     overlay.innerHTML=`
       <div class="item-author">${item.author}</div>
-      <div class="item-bottom">
-        <div class="item-date">${formatDate(item.date)}</div>
-        <button class="item-like ${item.liked?'liked':''}" onclick="toggleLike(event,${item.id})">
-          <svg viewBox="0 0 16 16" fill="${item.liked?'#ff3b3b':'none'}" stroke="${item.liked?'#ff3b3b':'currentColor'}" stroke-width="1.3">
-            <path d="M8 14s-6-3.9-6-8a4 4 0 0 1 6-3.4A4 4 0 0 1 14 6c0 4.1-6 8-6 8z"/>
-          </svg>
-          ${item.likes}
-        </button>
-      </div>`;
+      <div class="item-date">${formatDate(item.date)}</div>`;
     div.appendChild(canvas);
     div.appendChild(overlay);
-    div.addEventListener('click',e=>{if(!e.target.closest('.item-like'))openModal(item.id);});
+    div.addEventListener('click',()=>openModal(item.id));
     grid.appendChild(div);
   });
   grid.querySelectorAll('.grid-item').forEach(el=>{
@@ -332,13 +310,6 @@ function renderGrid(){
   });
 }
 
-function setSort(btn,sort){
-  document.querySelectorAll('.sort-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  currentSort=sort;
-  displayItems=sort==='likes'?[...items].sort((a,b)=>b.likes-a.likes):[...items].sort((a,b)=>b.date-a.date);
-  renderGrid();
-}
 
 function setView(btn,cols){
   document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
@@ -346,13 +317,6 @@ function setView(btn,cols){
   document.getElementById('gallery-grid').className=`gallery-grid grid-cols-${cols}`;
 }
 
-function toggleLike(e,id){
-  e.stopPropagation();
-  const item=items.find(i=>i.id===id);
-  item.liked=!item.liked;item.likes+=item.liked?1:-1;
-  if(currentSort==='likes') displayItems=[...items].sort((a,b)=>b.likes-a.likes);
-  renderGrid();
-}
 
 function openModal(id){
   const item=items.find(i=>i.id===id);
@@ -360,22 +324,10 @@ function openModal(id){
   generateCanvas(document.getElementById('modal-canvas'),item.seed);
   document.getElementById('modal-author').textContent=item.author;
   document.getElementById('modal-date').textContent=formatDate(item.date);
-  document.getElementById('modal-like-count').textContent=item.likes;
-  const lb=document.getElementById('modal-like-btn');
-  lb.className=`modal-btn${item.liked?' liked':''}`;
-  lb.innerHTML=`${item.liked?'♥':'♡'} <span id="modal-like-count">${item.likes}</span>`;
   document.getElementById('modal').classList.add('open');
 }
 
 function closeModal(){document.getElementById('modal').classList.remove('open');currentModal=null;}
-function toggleModalLike(){
-  if(!currentModal)return;
-  currentModal.liked=!currentModal.liked;currentModal.likes+=currentModal.liked?1:-1;
-  const lb=document.getElementById('modal-like-btn');
-  lb.className=`modal-btn${currentModal.liked?' liked':''}`;
-  lb.innerHTML=`${currentModal.liked?'♥':'♡'} <span id="modal-like-count">${currentModal.likes}</span>`;
-  renderGrid();
-}
 function downloadModal(){
   if(!currentModal)return;
   const canvas=document.getElementById('modal-canvas');
@@ -387,9 +339,9 @@ function openUpload(){document.getElementById('upload-panel').classList.add('ope
 function closeUpload(){document.getElementById('upload-panel').classList.remove('open');}
 function handleUpload(e){
   const file=e.target.files[0];if(!file)return;
-  const newItem={id:items.length,seed:Math.floor(Math.random()*9999),author:'Tu · appena aggiunto',date:new Date(),likes:0,liked:false};
+  const newItem={id:items.length,seed:Math.floor(Math.random()*9999),author:'Tu · appena aggiunto',date:new Date()};
   items.unshift(newItem);
-  displayItems=currentSort==='likes'?[...items].sort((a,b)=>b.likes-a.likes):[...items].sort((a,b)=>b.date-a.date);
+  displayItems=[...items].sort((a,b)=>b.date-a.date);
   document.getElementById('total-count').textContent=items.length;
   closeUpload();renderGrid();
   window.scrollTo({top:0,behavior:'smooth'});
