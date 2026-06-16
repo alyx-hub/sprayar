@@ -273,13 +273,36 @@ function generatePreview(seed) {
   }
 }
 
-// Leggi parametri dal QR (URL params)
+// Leggi parametri
 const params = new URLSearchParams(location.search);
-const code = params.get('code') || 'DG-2025-0247';
+const fromLedwall = params.get('from') === 'ledwall';
+const code = params.get('code') || ('DG-2025-0' + (Math.floor(Math.random()*900)+100));
 const num = parseInt(code.split('-').pop()) || 247;
-const seed = Array.from(code).reduce((a,c)=>a+c.charCodeAt(0),0);
 
-generatePreview(seed);
+// Controlla se c'è uno snapshot reale dal ledwall
+const snapshot = fromLedwall ? sessionStorage.getItem('dg-snapshot') : null;
+
+if (snapshot) {
+  // Mostra immagine reale
+  const canvas = document.getElementById('preview-canvas');
+  canvas.width = 380; canvas.height = 285;
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, 380, 285);
+    // Aggiorna link download con immagine reale
+    const dlBtn = document.querySelector('[onclick="startDownload()"]');
+    if (dlBtn) dlBtn.dataset.realSnapshot = snapshot;
+  };
+  img.src = snapshot;
+  // Pulisci sessionStorage dopo uso
+  sessionStorage.removeItem('dg-snapshot');
+} else {
+  // Fallback: genera preview con seed
+  const seed = Array.from(code).reduce((a,c)=>a+c.charCodeAt(0),0);
+  generatePreview(seed);
+}
+
 document.getElementById('preview-name').textContent = `Visitatore #${num}`;
 document.getElementById('preview-date').textContent = new Date().toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});
 
@@ -293,9 +316,13 @@ function startDownload() {
     if (p >= 100) {
       p=100; clearInterval(iv);
       setTimeout(() => {
+        // Usa snapshot reale se disponibile, altrimenti canvas generato
+        const dlBtn = document.querySelector('[onclick="startDownload()"]');
+        const realSnap = dlBtn ? dlBtn.dataset.realSnapshot : null;
         const canvas = document.getElementById('preview-canvas');
+        const dataUrl = realSnap || canvas.toDataURL('image/png');
         const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png');
+        a.href = dataUrl;
         a.download = `digital-graffiti-${num}.png`;
         a.click();
         setState('state-done');

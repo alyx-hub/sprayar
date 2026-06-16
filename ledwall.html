@@ -24,11 +24,12 @@ canvas{display:block;width:100vw;height:100vh;position:fixed;inset:0;}
   display:flex;flex-direction:column;gap:8px;align-items:flex-end;
 }
 #ledwall-save-btn{
-  font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;
-  color:var(--black);background:var(--white);padding:9px 16px;border-radius:2px;
-  border:none;cursor:pointer;transition:opacity .2s;white-space:nowrap;
+  font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--black);background:var(--white);padding:13px 24px;border-radius:2px;
+  border:none;cursor:pointer;transition:opacity .2s,transform .15s;white-space:nowrap;
+  box-shadow:0 2px 16px rgba(0,0,0,0.4);
 }
-#ledwall-save-btn:hover{opacity:0.82;}
+#ledwall-save-btn:hover{opacity:0.86;transform:translateY(-1px);}
 /* Tiny status indicator bottom-left */
 #ws-status{
   position:fixed;bottom:20px;left:16px;z-index:20;
@@ -307,15 +308,29 @@ canvas{display:block;width:100vw;height:100vh;position:fixed;inset:0;}
     setTimeout(()=>{txt.textContent='controller connesso';},3000);
   }
 
-  // Send snapshot to controller (triggered by ledwall save button)
+  // Salva snapshot e vai a download.html
   window.sendSnapshotToController = function() {
     const snap = canvas.toDataURL('image/png');
-    if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'snapshot',data:snap}));
-    // Also trigger download directly from ledwall
-    const a=document.createElement('a');
-    a.href=snap;
-    a.download='digital-graffiti.png';
-    a.click();
+    // Manda anche al controller se connesso
+    if(ws && ws.readyState===1) ws.send(JSON.stringify({type:'snapshot', data:snap}));
+    // Salva in sessionStorage e reindirizza
+    try {
+      sessionStorage.setItem('dg-snapshot', snap);
+    } catch(e) {
+      // sessionStorage piena (immagine troppo grande) — comprimi
+      const cv = document.createElement('canvas');
+      cv.width = 1280; cv.height = 720;
+      const cctx = cv.getContext('2d');
+      const img = new Image();
+      img.onload = () => {
+        cctx.drawImage(img, 0, 0, 1280, 720);
+        sessionStorage.setItem('dg-snapshot', cv.toDataURL('image/jpeg', 0.85));
+        window.location.href = 'download.html?from=ledwall';
+      };
+      img.src = snap;
+      return;
+    }
+    window.location.href = 'download.html?from=ledwall';
   };
 
   // Keyboard
