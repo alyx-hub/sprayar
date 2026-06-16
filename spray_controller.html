@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Digital Graffiti — Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black: #080808; --white: #f5f4f0; --spray: #ff3b3b;
+  --dim: rgba(245,244,240,0.1); --dim2: rgba(245,244,240,0.04);
+  --mono: 'Space Mono', monospace; --sans: 'Space Grotesk', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--black); color: var(--white); font-family: var(--sans); overflow: hidden; height: 100dvh; width: 100vw; touch-action: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+/* ── INTRO ─────────────────────────────────────────────────────── */
+#intro {
+  position: fixed; inset: 0; background: var(--black);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0; z-index: 100; padding: 32px; text-align: center;
+}
+.intro-logo { color: var(--white); margin-bottom: 32px; }
+.intro-logo svg { width: 110px; height: auto; }
+.intro-eyebrow {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: rgba(245,244,240,0.3); margin-bottom: 16px;
+}
+.intro-title {
+  font-size: clamp(32px, 8vw, 48px); font-weight: 700;
+  letter-spacing: -0.03em; line-height: 1.0; margin-bottom: 6px;
+}
+.intro-title em { font-style: normal; color: transparent; -webkit-text-stroke: 1.5px var(--white); }
+.intro-sub {
+  font-size: 13px; color: rgba(245,244,240,0.42); line-height: 1.65;
+  max-width: 280px; font-weight: 300; margin-bottom: 32px; margin-top: 12px;
+}
+.intro-steps {
+  display: flex; flex-direction: column; gap: 10px;
+  width: 100%; max-width: 300px; margin-bottom: 32px; text-align: left;
+}
+.intro-step {
+  display: flex; gap: 14px; align-items: flex-start;
+  font-size: 12px; color: rgba(245,244,240,0.55); line-height: 1.5;
+  padding-bottom: 10px; border-bottom: 0.5px solid var(--dim);
+}
+.intro-step:last-child { border-bottom: none; padding-bottom: 0; }
+.intro-step-n {
+  font-family: var(--mono); font-size: 9px; color: rgba(245,244,240,0.25);
+  padding-top: 2px; flex-shrink: 0; width: 14px;
+}
+#start-btn {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--black); background: var(--white);
+  padding: 14px 40px; border-radius: 2px; border: none; cursor: pointer;
+  transition: opacity .2s;
+}
+#start-btn:hover { opacity: 0.86; }
+#no-ar-msg { display: none; color: #f87171; font-size: 12px; max-width: 260px; line-height: 1.5; margin-top: 8px; }
+
+/* ── STATUS BAR ─────────────────────────────────────────────────── */
+#statusbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; height: 48px;
+  background: rgba(8,8,8,0.82); backdrop-filter: blur(16px);
+  border-bottom: 0.5px solid var(--dim);
+  pointer-events: none;
+}
+.status-logo { color: var(--white); pointer-events: all; }
+.status-logo svg { width: 64px; height: auto; display: block; }
+.status-center {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(245,244,240,0.4);
+  position: absolute; left: 50%; transform: translateX(-50%);
+}
+#status-dot { width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; transition: background .3s; flex-shrink: 0; }
+#status-dot.connected { background: #30d158; }
+/* Save button — right side of statusbar */
+#save-btn {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--black); background: var(--white);
+  padding: 7px 14px; border-radius: 2px; border: none; cursor: pointer;
+  pointer-events: all; transition: opacity .2s; display: none; white-space: nowrap;
+}
+#save-btn.visible { display: block; }
+#save-btn:hover { opacity: 0.82; }
+
+/* ── RETICOLO ────────────────────────────────────────────────────── */
+#reticle {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 44px; height: 44px; pointer-events: none; z-index: 15;
+}
+#calib-crosshair {
+  position: fixed; width: 50px; height: 50px;
+  transform: translate(-50%, -50%); pointer-events: none; z-index: 51; display: none;
+}
+#calib-crosshair.show { display: block; }
+
+/* ── COLORBAR ────────────────────────────────────────────────────── */
+#colorbar {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center;
+  background: rgba(8,8,8,0.7); backdrop-filter: blur(16px);
+  padding: 9px 14px; border-radius: 2px;
+  border: 0.5px solid var(--dim); z-index: 20;
+}
+.color-swatch {
+  width: 24px; height: 24px; border-radius: 50%;
+  cursor: pointer; border: 1.5px solid transparent;
+  transition: transform .15s, border-color .15s;
+}
+.color-swatch.active { border-color: var(--white); transform: scale(1.25); }
+
+/* ── SPRAY BUTTON ─────────────────────────────────────────────────── */
+#spray-btn {
+  position: fixed; bottom: 100px; right: 24px;
+  width: 72px; height: 72px; border-radius: 2px;
+  background: rgba(245,244,240,0.1); border: 0.5px solid rgba(245,244,240,0.2);
+  backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 20; -webkit-tap-highlight-color: transparent; user-select: none;
+  transition: background .1s, transform .1s;
+}
+#spray-btn.active { background: rgba(245,244,240,0.25); transform: scale(0.93); }
+#spray-btn svg { width: 32px; height: 32px; }
+
+/* ── LEFT CONTROLS ─────────────────────────────────────────────────── */
+#left-controls {
+  position: fixed; bottom: 100px; left: 20px;
+  display: flex; flex-direction: column; gap: 8px; z-index: 20;
+}
+.ctrl-btn {
+  width: 44px; height: 44px; border-radius: 2px;
+  background: rgba(8,8,8,0.7); border: 0.5px solid var(--dim);
+  backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; -webkit-tap-highlight-color: transparent; user-select: none;
+  font-family: var(--mono);
+}
+
+/* ── SIZE SLIDER ─────────────────────────────────────────────────── */
+#size-wrap {
+  position: fixed; left: 14px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 20;
+}
+#size-slider {
+  -webkit-appearance: slider-vertical; appearance: slider-vertical;
+  writing-mode: vertical-lr; direction: rtl;
+  width: 24px; height: 100px; cursor: pointer; accent-color: var(--white); opacity: 0.55;
+}
+#size-label {
+  font-family: var(--mono); font-size: 8px; color: rgba(245,244,240,0.3);
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+/* ── BG BAR ─────────────────────────────────────────────────────── */
+#bg-bar {
+  position: fixed; top: 60px; right: 14px;
+  display: flex; flex-direction: column; gap: 5px; z-index: 20;
+}
+.bg-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  cursor: pointer; border: 1.5px solid transparent;
+  transition: transform .15s, border-color .15s;
+}
+.bg-dot.active { border-color: var(--white); transform: scale(1.15); }
+
+/* ── CALIB OVERLAY ─────────────────────────────────────────────────── */
+#calib-overlay { position: fixed; inset: 0; z-index: 50; pointer-events: none; display: none; }
+#calib-overlay.active { display: block; pointer-events: all; }
+#calib-msg {
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+  background: rgba(8,8,8,0.82); backdrop-filter: blur(12px);
+  padding: 10px 18px; border-radius: 2px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--white); text-align: center;
+  border: 0.5px solid var(--dim); max-width: 280px; line-height: 1.5;
+  pointer-events: none;
+}
+
+/* ── SAVE MODAL ─────────────────────────────────────────────────── */
+#save-modal {
+  position: fixed; inset: 0; background: rgba(8,8,8,0.94);
+  z-index: 200; display: none; align-items: center; justify-content: center;
+  padding: 28px; backdrop-filter: blur(20px);
+}
+#save-modal.open { display: flex; }
+.save-inner {
+  max-width: 360px; width: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 20px; text-align: center;
+}
+.save-eyebrow {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: rgba(245,244,240,0.3);
+}
+.save-title { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.05; }
+.save-preview {
+  width: 100%; aspect-ratio: 4/3;
+  border: 0.5px solid var(--dim); background: var(--dim2); overflow: hidden;
+}
+.save-preview canvas { width: 100%; height: 100%; display: block; }
+.save-code {
+  font-family: var(--mono); font-size: 18px; font-weight: 700;
+  letter-spacing: 0.08em; color: var(--spray);
+  padding: 10px 20px; border: 0.5px solid rgba(255,59,59,0.25);
+  border-radius: 2px; background: rgba(255,59,59,0.05);
+}
+.save-sub { font-size: 12px; color: rgba(245,244,240,0.38); line-height: 1.6; font-weight: 300; max-width: 280px; }
+.save-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.save-btn-primary {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--black); background: var(--white);
+  padding: 14px; border-radius: 2px; border: none; cursor: pointer;
+  text-decoration: none; display: block; text-align: center; transition: opacity .2s;
+}
+.save-btn-primary:hover { opacity: 0.86; }
+.save-btn-ghost {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: rgba(245,244,240,0.5);
+  background: transparent; padding: 13px; border-radius: 2px;
+  border: 0.5px solid var(--dim); cursor: pointer; transition: border-color .2s;
+}
+.save-btn-ghost:hover { border-color: rgba(245,244,240,0.35); color: var(--white); }
+</style>
+</head>
+<body>
+
+<!-- INTRO SCREEN -->
+<div id="intro">
+  <div class="intro-logo"><svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="80" height="73" viewBox="0 0 1357.000000 1230.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,1230.000000) scale(0.100000,-0.100000)"
+fill="currentColor" stroke="none">
+<path d="M5370 11905 l0 -395 -395 0 -395 0 0 -395 0 -395 393 2 392 3 3 393
+2 392 390 0 390 0 0 395 0 395 -390 0 -390 0 0 -395z"/>
+<path d="M1357 11613 c-4 -3 -7 -552 -7 -1220 l0 -1213 1220 0 1220 0 0 1220
+0 1220 -1213 0 c-668 0 -1217 -3 -1220 -7z"/>
+<path d="M6150 10330 l0 -390 395 0 395 0 0 390 0 390 -395 0 -395 0 0 -390z"/>
+<path d="M4580 9545 l0 -395 395 0 395 0 0 -395 0 -395 390 0 390 0 0 395 0
+395 -390 0 -390 0 -2 393 -3 392 -392 3 -393 2 0 -395z"/>
+<path d="M0 4200 l0 -4190 2370 0 2370 0 0 400 0 400 -1970 0 -1970 0 2 3393
+3 3392 1968 3 1967 2 0 395 0 395 -2370 0 -2370 0 0 -4190z"/>
+<path d="M5005 6810 c-131 -14 -262 -57 -373 -121 -80 -48 -238 -208 -287
+-293 -154 -267 -196 -614 -114 -941 63 -253 246 -480 472 -585 114 -54 206
+-72 362 -73 239 -1 363 45 515 190 50 47 92 84 94 82 2 -2 11 -55 21 -116 l18
+-113 133 0 134 0 0 520 0 520 -400 0 -400 0 0 -165 0 -165 221 0 221 0 -6 -37
+c-11 -59 -69 -173 -114 -224 -105 -117 -270 -173 -442 -149 -136 19 -284 108
+-355 213 -79 116 -117 327 -96 541 20 214 62 325 166 435 112 118 212 156 389
+149 125 -6 190 -26 268 -83 59 -43 94 -89 124 -162 l23 -58 195 -3 c224 -3
+208 -11 181 93 -36 137 -119 267 -232 360 -178 147 -438 215 -718 185z"/>
+<path d="M1610 5805 l0 -966 488 4 c433 3 494 5 552 22 218 61 358 180 466
+400 92 187 132 404 120 645 -19 386 -159 652 -410 775 -153 75 -165 77 -723
+82 l-493 5 0 -967z m918 610 c119 -28 182 -79 231 -184 53 -115 65 -191 65
+-406 -1 -163 -4 -201 -22 -268 -47 -170 -134 -291 -249 -345 -57 -26 -61 -27
+-305 -30 l-248 -4 0 626 0 626 233 0 c170 0 249 -4 295 -15z"/>
+<path d="M3510 5805 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+<path d="M6330 5805 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+<path d="M6950 6600 l0 -170 285 0 285 0 0 -795 0 -795 205 0 205 0 0 795 0
+795 285 0 285 0 0 170 0 170 -775 0 -775 0 0 -170z"/>
+<path d="M8752 5813 c-188 -527 -342 -961 -342 -965 0 -5 93 -8 208 -8 l207 0
+66 198 65 197 354 0 354 0 13 -35 c6 -19 36 -108 64 -197 l52 -163 218 0 219
+0 -44 123 c-24 67 -177 501 -341 965 l-298 842 -227 0 -227 0 -341 -957z m686
+131 l119 -369 -240 -3 c-132 -1 -242 0 -244 2 -3 3 50 171 118 375 68 203 125
+369 126 367 1 -1 56 -168 121 -372z"/>
+<path d="M10477 6764 c-4 -4 -7 -439 -7 -966 l0 -958 685 0 685 0 0 175 0 175
+-480 0 -480 0 -2 788 -3 787 -196 3 c-107 1 -198 -1 -202 -4z"/>
+<path d="M2350 3605 c-8 -2 -49 -9 -90 -15 -385 -62 -667 -378 -730 -815 -12
+-90 -12 -300 0 -390 36 -250 121 -418 293 -581 93 -88 220 -161 332 -189 145
+-37 353 -37 485 1 100 29 190 84 277 171 46 44 83 80 83 80 0 -1 9 -54 20
+-117 11 -63 20 -116 20 -118 0 -1 60 -1 133 0 l132 3 0 515 0 515 -400 0 -400
+0 -3 -157 -3 -158 226 0 c124 0 225 -4 225 -8 0 -21 -35 -122 -57 -166 -31
+-61 -114 -150 -171 -183 -73 -43 -155 -63 -255 -63 -106 0 -167 14 -253 58
+-183 92 -269 254 -281 527 -15 332 70 559 253 680 86 57 160 78 279 77 213 0
+362 -93 422 -263 l18 -49 197 0 c109 0 198 4 198 8 0 5 -9 43 -19 84 -52 204
+-188 367 -386 463 -101 49 -171 69 -295 84 -77 10 -213 13 -250 6z"/>
+<path d="M3700 2596 l0 -966 195 0 195 0 0 381 0 381 258 -4 c253 -3 258 -3
+313 -29 46 -22 60 -35 77 -70 30 -62 42 -152 42 -310 0 -132 20 -291 41 -330
+9 -18 22 -19 227 -17 199 3 217 4 220 21 2 10 -11 34 -28 53 -17 20 -36 48
+-42 63 -6 14 -14 136 -18 271 -7 215 -10 253 -30 308 -26 73 -91 147 -160 182
+l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
+18 -601 21 l-538 4 0 -965z m971 614 c98 -27 151 -105 158 -228 6 -127 -32
+-206 -118 -246 -43 -20 -65 -21 -333 -24 l-288 -3 0 255 0 256 273 0 c151 0
+288 -5 308 -10z"/>
+<path d="M6167 3547 c-39 -101 -677 -1898 -677 -1906 0 -8 59 -11 208 -9 l207
+3 64 198 65 197 355 -2 355 -3 64 -197 64 -198 214 0 c162 0 214 3 214 12 0 7
+-152 441 -337 965 l-337 953 -227 0 c-178 0 -228 -3 -232 -13z m347 -803 c64
+-198 116 -366 116 -372 0 -9 -64 -12 -240 -12 -132 0 -240 3 -240 7 0 13 241
+745 245 741 2 -1 55 -165 119 -364z"/>
+<path d="M7550 2595 l0 -965 200 0 200 0 0 405 0 405 425 0 425 0 0 170 0 170
+-425 0 -425 0 0 220 0 220 485 0 485 0 0 170 0 170 -685 0 -685 0 0 -965z"/>
+<path d="M9185 3548 c-3 -7 -4 -440 -3 -963 l3 -950 198 -3 197 -2 0 405 0
+405 430 0 430 0 -2 168 -3 167 -428 3 -427 2 2 218 3 217 488 3 487 2 -2 168
+-3 167 -683 3 c-541 2 -684 0 -687 -10z"/>
+<path d="M10790 2595 l0 -965 195 0 195 0 0 965 0 965 -195 0 -195 0 0 -965z"/>
+<path d="M11400 3390 l0 -170 290 0 290 0 0 -795 0 -795 200 0 200 0 0 795 0
+795 290 0 290 0 0 170 0 170 -780 0 -780 0 0 -170z"/>
+<path d="M13160 2595 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+</g>
+</svg></div>
+  <div class="intro-eyebrow">Controller · AR</div>
+  <h1 class="intro-title">Digital<br><em>Graffiti</em></h1>
+  <p class="intro-sub">Punta verso una superficie e tieni premuto spray per disegnare sul ledwall.</p>
+  <div class="intro-steps">
+    <div class="intro-step"><span class="intro-step-n">01</span><span>Punta la fotocamera verso una superficie piana</span></div>
+    <div class="intro-step"><span class="intro-step-n">02</span><span>Premi <b>⊹</b> per calibrare i 4 angoli del ledwall</span></div>
+    <div class="intro-step"><span class="intro-step-n">03</span><span>Tieni premuto spray per disegnare</span></div>
+  </div>
+  <button id="start-btn">Avvia</button>
+  <p id="no-ar-msg"></p>
+</div>
+
+<canvas id="ar-canvas"></canvas>
+
+<!-- RETICOLO -->
+<svg id="reticle" viewBox="0 0 44 44" fill="none">
+  <circle cx="22" cy="22" r="18" stroke="white" stroke-width="1" stroke-dasharray="4 3" opacity="0.5"/>
+  <line x1="22" y1="8"  x2="22" y2="16" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="22" y1="28" x2="22" y2="36" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="8"  y1="22" x2="16" y2="22" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="28" y1="22" x2="36" y2="22" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="22" cy="22" r="2.5" fill="white"/>
+</svg>
+
+<svg id="calib-crosshair" viewBox="0 0 50 50" fill="none">
+  <circle cx="25" cy="25" r="20" stroke="#ffd60a" stroke-width="2" stroke-dasharray="5 3"/>
+  <line x1="25" y1="5"  x2="25" y2="18" stroke="#ffd60a" stroke-width="2" stroke-linecap="round"/>
+  <line x1="25" y1="32" x2="25" y2="45" stroke="#ffd60a" stroke-width="2" stroke-linecap="round"/>
+  <line x1="5"  y1="25" x2="18" y2="25" stroke="#ffd60a" stroke-width="2" stroke-linecap="round"/>
+  <line x1="32" y1="25" x2="45" y2="25" stroke="#ffd60a" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="25" cy="25" r="3" fill="#ffd60a"/>
+</svg>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <a href="index.html" class="status-logo"><svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="80" height="73" viewBox="0 0 1357.000000 1230.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,1230.000000) scale(0.100000,-0.100000)"
+fill="currentColor" stroke="none">
+<path d="M5370 11905 l0 -395 -395 0 -395 0 0 -395 0 -395 393 2 392 3 3 393
+2 392 390 0 390 0 0 395 0 395 -390 0 -390 0 0 -395z"/>
+<path d="M1357 11613 c-4 -3 -7 -552 -7 -1220 l0 -1213 1220 0 1220 0 0 1220
+0 1220 -1213 0 c-668 0 -1217 -3 -1220 -7z"/>
+<path d="M6150 10330 l0 -390 395 0 395 0 0 390 0 390 -395 0 -395 0 0 -390z"/>
+<path d="M4580 9545 l0 -395 395 0 395 0 0 -395 0 -395 390 0 390 0 0 395 0
+395 -390 0 -390 0 -2 393 -3 392 -392 3 -393 2 0 -395z"/>
+<path d="M0 4200 l0 -4190 2370 0 2370 0 0 400 0 400 -1970 0 -1970 0 2 3393
+3 3392 1968 3 1967 2 0 395 0 395 -2370 0 -2370 0 0 -4190z"/>
+<path d="M5005 6810 c-131 -14 -262 -57 -373 -121 -80 -48 -238 -208 -287
+-293 -154 -267 -196 -614 -114 -941 63 -253 246 -480 472 -585 114 -54 206
+-72 362 -73 239 -1 363 45 515 190 50 47 92 84 94 82 2 -2 11 -55 21 -116 l18
+-113 133 0 134 0 0 520 0 520 -400 0 -400 0 0 -165 0 -165 221 0 221 0 -6 -37
+c-11 -59 -69 -173 -114 -224 -105 -117 -270 -173 -442 -149 -136 19 -284 108
+-355 213 -79 116 -117 327 -96 541 20 214 62 325 166 435 112 118 212 156 389
+149 125 -6 190 -26 268 -83 59 -43 94 -89 124 -162 l23 -58 195 -3 c224 -3
+208 -11 181 93 -36 137 -119 267 -232 360 -178 147 -438 215 -718 185z"/>
+<path d="M1610 5805 l0 -966 488 4 c433 3 494 5 552 22 218 61 358 180 466
+400 92 187 132 404 120 645 -19 386 -159 652 -410 775 -153 75 -165 77 -723
+82 l-493 5 0 -967z m918 610 c119 -28 182 -79 231 -184 53 -115 65 -191 65
+-406 -1 -163 -4 -201 -22 -268 -47 -170 -134 -291 -249 -345 -57 -26 -61 -27
+-305 -30 l-248 -4 0 626 0 626 233 0 c170 0 249 -4 295 -15z"/>
+<path d="M3510 5805 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+<path d="M6330 5805 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+<path d="M6950 6600 l0 -170 285 0 285 0 0 -795 0 -795 205 0 205 0 0 795 0
+795 285 0 285 0 0 170 0 170 -775 0 -775 0 0 -170z"/>
+<path d="M8752 5813 c-188 -527 -342 -961 -342 -965 0 -5 93 -8 208 -8 l207 0
+66 198 65 197 354 0 354 0 13 -35 c6 -19 36 -108 64 -197 l52 -163 218 0 219
+0 -44 123 c-24 67 -177 501 -341 965 l-298 842 -227 0 -227 0 -341 -957z m686
+131 l119 -369 -240 -3 c-132 -1 -242 0 -244 2 -3 3 50 171 118 375 68 203 125
+369 126 367 1 -1 56 -168 121 -372z"/>
+<path d="M10477 6764 c-4 -4 -7 -439 -7 -966 l0 -958 685 0 685 0 0 175 0 175
+-480 0 -480 0 -2 788 -3 787 -196 3 c-107 1 -198 -1 -202 -4z"/>
+<path d="M2350 3605 c-8 -2 -49 -9 -90 -15 -385 -62 -667 -378 -730 -815 -12
+-90 -12 -300 0 -390 36 -250 121 -418 293 -581 93 -88 220 -161 332 -189 145
+-37 353 -37 485 1 100 29 190 84 277 171 46 44 83 80 83 80 0 -1 9 -54 20
+-117 11 -63 20 -116 20 -118 0 -1 60 -1 133 0 l132 3 0 515 0 515 -400 0 -400
+0 -3 -157 -3 -158 226 0 c124 0 225 -4 225 -8 0 -21 -35 -122 -57 -166 -31
+-61 -114 -150 -171 -183 -73 -43 -155 -63 -255 -63 -106 0 -167 14 -253 58
+-183 92 -269 254 -281 527 -15 332 70 559 253 680 86 57 160 78 279 77 213 0
+362 -93 422 -263 l18 -49 197 0 c109 0 198 4 198 8 0 5 -9 43 -19 84 -52 204
+-188 367 -386 463 -101 49 -171 69 -295 84 -77 10 -213 13 -250 6z"/>
+<path d="M3700 2596 l0 -966 195 0 195 0 0 381 0 381 258 -4 c253 -3 258 -3
+313 -29 46 -22 60 -35 77 -70 30 -62 42 -152 42 -310 0 -132 20 -291 41 -330
+9 -18 22 -19 227 -17 199 3 217 4 220 21 2 10 -11 34 -28 53 -17 20 -36 48
+-42 63 -6 14 -14 136 -18 271 -7 215 -10 253 -30 308 -26 73 -91 147 -160 182
+l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
+18 -601 21 l-538 4 0 -965z m971 614 c98 -27 151 -105 158 -228 6 -127 -32
+-206 -118 -246 -43 -20 -65 -21 -333 -24 l-288 -3 0 255 0 256 273 0 c151 0
+288 -5 308 -10z"/>
+<path d="M6167 3547 c-39 -101 -677 -1898 -677 -1906 0 -8 59 -11 208 -9 l207
+3 64 198 65 197 355 -2 355 -3 64 -197 64 -198 214 0 c162 0 214 3 214 12 0 7
+-152 441 -337 965 l-337 953 -227 0 c-178 0 -228 -3 -232 -13z m347 -803 c64
+-198 116 -366 116 -372 0 -9 -64 -12 -240 -12 -132 0 -240 3 -240 7 0 13 241
+745 245 741 2 -1 55 -165 119 -364z"/>
+<path d="M7550 2595 l0 -965 200 0 200 0 0 405 0 405 425 0 425 0 0 170 0 170
+-425 0 -425 0 0 220 0 220 485 0 485 0 0 170 0 170 -685 0 -685 0 0 -965z"/>
+<path d="M9185 3548 c-3 -7 -4 -440 -3 -963 l3 -950 198 -3 197 -2 0 405 0
+405 430 0 430 0 -2 168 -3 167 -428 3 -427 2 2 218 3 217 488 3 487 2 -2 168
+-3 167 -683 3 c-541 2 -684 0 -687 -10z"/>
+<path d="M10790 2595 l0 -965 195 0 195 0 0 965 0 965 -195 0 -195 0 0 -965z"/>
+<path d="M11400 3390 l0 -170 290 0 290 0 0 -795 0 -795 200 0 200 0 0 795 0
+795 290 0 290 0 0 170 0 170 -780 0 -780 0 0 -170z"/>
+<path d="M13160 2595 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+</g>
+</svg></a>
+  <div class="status-center">
+    <div id="status-dot"></div>
+    <span id="status-text">connessione…</span>
+  </div>
+  <button id="save-btn" onclick="openSaveModal()">↓ Salva graffito</button>
+</div>
+
+<!-- CALIB OVERLAY -->
+<div id="calib-overlay">
+  <div id="calib-msg">Punta al mirino giallo e tocca</div>
+</div>
+
+<!-- SIZE SLIDER -->
+<div id="size-wrap">
+  <span id="size-label">size</span>
+  <input type="range" id="size-slider" min="0.02" max="0.25" step="0.01" value="0.07" orient="vertical">
+</div>
+
+<!-- COLORBAR -->
+<div id="colorbar">
+  <div class="color-swatch active" data-hex="255,59,59"   style="background:#ff3b3b"></div>
+  <div class="color-swatch" data-hex="255,159,10"  style="background:#ff9f0a"></div>
+  <div class="color-swatch" data-hex="255,214,10"  style="background:#ffd60a"></div>
+  <div class="color-swatch" data-hex="48,209,88"   style="background:#30d158"></div>
+  <div class="color-swatch" data-hex="10,132,255"  style="background:#0a84ff"></div>
+  <div class="color-swatch" data-hex="191,90,242"  style="background:#bf5af2"></div>
+  <div class="color-swatch" data-hex="255,255,255" style="background:#fff"></div>
+</div>
+
+<!-- BG BAR -->
+<div id="bg-bar">
+  <div class="bg-dot active" data-bg="#0a0a0a" style="background:#1a1a1a;border-color:rgba(255,255,255,0.3)"></div>
+  <div class="bg-dot" data-bg="#ffffff" style="background:#ffffff"></div>
+  <div class="bg-dot" data-bg="#1a1a2e" style="background:#1a1a2e"></div>
+  <div class="bg-dot" data-bg="#2d1b00" style="background:#2d1b00"></div>
+  <div class="bg-dot" data-bg="#0d2818" style="background:#0d2818"></div>
+  <div class="bg-dot" data-bg="#1a0a2e" style="background:#1a0a2e"></div>
+  <div class="bg-dot" id="bg-upload-btn" style="background:rgba(245,244,240,0.08);display:flex;align-items:center;justify-content:center;font-size:10px;border:0.5px dashed rgba(245,244,240,0.3);font-family:var(--mono)">+</div>
+  <input type="file" id="bg-file-input" accept="image/*" style="display:none;">
+</div>
+
+<!-- SPRAY BUTTON -->
+<button id="spray-btn" aria-label="Spruzza">
+  <svg viewBox="0 0 32 32" fill="none">
+    <rect x="11" y="10" width="10" height="18" rx="2" fill="rgba(245,244,240,0.85)"/>
+    <rect x="13" y="7"  width="6"  height="5"  rx="1.5" fill="rgba(245,244,240,0.6)"/>
+    <rect x="18" y="5"  width="5"  height="3"  rx="1"   fill="rgba(245,244,240,0.5)"/>
+    <circle cx="25" cy="6"  r="1.2" fill="rgba(245,244,240,0.7)"/>
+    <circle cx="27" cy="9"  r="0.8" fill="rgba(245,244,240,0.5)"/>
+    <circle cx="24" cy="10" r="1"   fill="rgba(245,244,240,0.5)"/>
+    <circle cx="26" cy="12" r="0.7" fill="rgba(245,244,240,0.4)"/>
+  </svg>
+</button>
+
+<!-- LEFT CONTROLS -->
+<div id="left-controls">
+  <div class="ctrl-btn" id="clear-btn" title="Cancella">🗑</div>
+  <div class="ctrl-btn" id="calib-btn" title="Calibra">⊹</div>
+</div>
+
+<!-- SAVE MODAL -->
+<div id="save-modal">
+  <div class="save-inner">
+    <div class="save-eyebrow">La tua opera è pronta</div>
+    <h2 class="save-title">Salva il<br>graffito</h2>
+    <div class="save-preview"><canvas id="save-canvas"></canvas></div>
+    <div class="save-code" id="save-code">DG-2025-0001</div>
+    <p class="save-sub">Vai alla pagina personale con questo codice per scaricare l'opera in alta qualità.</p>
+    <div class="save-actions">
+      <a id="save-link" href="download.html" class="save-btn-primary">↓ Vai alla pagina di download</a>
+      <button class="save-btn-ghost" onclick="closeSaveModal()">Continua a disegnare</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  // ── Refs ────────────────────────────────────────────────────────
+  const introEl    = document.getElementById('intro');
+  const startBtn   = document.getElementById('start-btn');
+  const noArMsg    = document.getElementById('no-ar-msg');
+  const sprayBtn   = document.getElementById('spray-btn');
+  const clearBtn   = document.getElementById('clear-btn');
+  const calibBtn   = document.getElementById('calib-btn');
+  const calibOverlay = document.getElementById('calib-overlay');
+  const calibMsg   = document.getElementById('calib-msg');
+  const calibCross = document.getElementById('calib-crosshair');
+  const statusDot  = document.getElementById('status-dot');
+  const statusTxt  = document.getElementById('status-text');
+  const saveBtnTop = document.getElementById('save-btn');
+  const sizeSlider = document.getElementById('size-slider');
+  const swatches   = document.querySelectorAll('.color-swatch');
+  const bgDots     = document.querySelectorAll('.bg-dot');
+
+  let sprayColorHex = '255,59,59';
+  let spraySize     = 0.07;
+  let spraying      = false;
+  let sprayPressure = 0;
+  let hitPosition   = null;
+  let calibrating   = false;
+  let calibStep     = 0;
+  let calibPoints3D = [];
+  let homographyReady = false;
+  let H = null;
+
+  // ── Codice sessione unico ────────────────────────────────────────
+  const sessionNum = Math.floor(Math.random() * 900) + 100;
+  const sessionCode = `DG-2025-0${sessionNum}`;
+
+  // ── Calibrazione ────────────────────────────────────────────────
+  const CORNER_LABELS = ['angolo alto sinistra','angolo alto destra','angolo basso sinistra','angolo basso destra'];
+
+  function startCalibration() {
+    calibrating = true; calibStep = 0; calibPoints3D = [];
+    homographyReady = false; H = null;
+    calibOverlay.classList.add('active');
+    calibCross.classList.add('show');
+    updateCalibMsg();
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'calib-pattern', on: true }));
+  }
+
+  function updateCalibMsg() {
+    if (calibStep < 4) calibMsg.textContent = `${calibStep+1}/4 — punta al ${CORNER_LABELS[calibStep]} e tocca`;
+  }
+
+  function recordCalibPoint() {
+    if (!hitPosition) { calibMsg.textContent = 'Nessuna superficie — riprova'; setTimeout(updateCalibMsg, 1500); return; }
+    calibPoints3D.push(hitPosition.clone());
+    calibStep++;
+    if (calibStep < 4) { updateCalibMsg(); }
+    else {
+      computeHomography();
+      calibrating = false;
+      calibOverlay.classList.remove('active');
+      calibCross.classList.remove('show');
+      homographyReady = true;
+      setStatus('calibrato ✓');
+      saveBtnTop.classList.add('visible');
+      if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'calibrated' }));
+        ws.send(JSON.stringify({ type: 'calib-pattern', on: false }));
+      }
+      setTimeout(() => setStatus('premi spray'), 2000);
+    }
+  }
+
+  calibOverlay.addEventListener('click', recordCalibPoint);
+
+  calibBtn.addEventListener('click', () => {
+    if (calibrating) {
+      calibrating = false;
+      calibOverlay.classList.remove('active');
+      calibCross.classList.remove('show');
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'calib-pattern', on: false }));
+      setStatus(homographyReady ? 'calibrato ✓' : 'cerca superficie…');
+    } else { startCalibration(); }
+  });
+
+  function computeHomography() {
+    const [TL, TR, BL] = calibPoints3D;
+    const axisU = new THREE.Vector3().subVectors(TR, TL);
+    const axisV = new THREE.Vector3().subVectors(BL, TL);
+    H = { TL, axisU, axisV, lenU: axisU.length(), lenV: axisV.length() };
+  }
+
+  function projectToLedwall(pos) {
+    if (!H) return null;
+    const d = new THREE.Vector3().subVectors(pos, H.TL);
+    return { x: Math.max(0,Math.min(1, d.dot(H.axisU)/(H.lenU*H.lenU))), y: Math.max(0,Math.min(1, d.dot(H.axisV)/(H.lenV*H.lenV))) };
+  }
+
+  function projectFallback(hit, cam) {
+    const dir = hit.clone().sub(cam).normalize();
+    return { x: Math.max(0,Math.min(1, 0.5+dir.x*1.2)), y: Math.max(0,Math.min(1, 0.5-dir.y*1.2)) };
+  }
+
+  // ── WebSocket ────────────────────────────────────────────────────
+  let ws;
+  const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+  function connectWS() {
+    ws = new WebSocket(`${wsProto}://${location.host}/controller`);
+    ws.onopen  = () => { statusDot.classList.add('connected'); setStatus('connesso'); };
+    ws.onclose = () => { statusDot.classList.remove('connected'); setStatus('disconnesso…'); setTimeout(connectWS, 2000); };
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'bg') bgDots.forEach(d => d.classList.toggle('active', d.dataset.bg === msg.color));
+      } catch {}
+    };
+  }
+
+  function setStatus(txt) { statusTxt.textContent = txt; }
+
+  function sendSpray(x, y, pressure) {
+    if (!ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type:'spray', x, y, color:sprayColorHex, size:spraySize, pressure, session:sessionCode }));
+  }
+
+  // ── Three.js + WebXR ─────────────────────────────────────────────
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, canvas:document.getElementById('ar-canvas') });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  let hitTestSource = null;
+  let hitTestSourceRequested = false;
+  let camPos = new THREE.Vector3();
+
+  function onXRFrame(timestamp, frame) {
+    if (!frame) return;
+    const session = renderer.xr.getSession();
+
+    if (!hitTestSourceRequested) {
+      session.requestReferenceSpace('viewer').then(vs => {
+        session.requestHitTestSource({ space:vs }).then(src => { hitTestSource = src; });
+      });
+      hitTestSourceRequested = true;
+    }
+
+    if (hitTestSource) {
+      const refSpace = renderer.xr.getReferenceSpace();
+      const results  = frame.getHitTestResults(hitTestSource);
+      const viewerPose = frame.getViewerPose(refSpace);
+      if (viewerPose) { const p=viewerPose.views[0].transform.position; camPos.set(p.x,p.y,p.z); }
+
+      if (results.length > 0) {
+        const m = results[0].getPose(refSpace).transform.matrix;
+        hitPosition = new THREE.Vector3(m[12],m[13],m[14]);
+
+        if (calibrating) {
+          calibCross.style.left = (window.innerWidth/2)+'px';
+          calibCross.style.top  = (window.innerHeight/2)+'px';
+        }
+
+        if (spraying && !calibrating) {
+          sprayPressure = Math.min(1, sprayPressure+0.07);
+          const coords = homographyReady ? projectToLedwall(hitPosition) : projectFallback(hitPosition, camPos);
+          if (coords) sendSpray(coords.x, coords.y, sprayPressure);
+          setStatus('spruzzando…');
+        } else if (!calibrating) {
+          sprayPressure = Math.max(0, sprayPressure-0.1);
+          setStatus(homographyReady ? 'premi spray' : 'calibra prima — ⊹');
+        }
+        document.getElementById('reticle').style.opacity = '1';
+      } else {
+        hitPosition = null;
+        document.getElementById('reticle').style.opacity = '0.3';
+        if (!calibrating && !spraying) setStatus('cerca superficie…');
+      }
+    }
+    renderer.render(scene, camera);
+  }
+
+  // ── Avvio ────────────────────────────────────────────────────────
+  startBtn.addEventListener('click', async () => {
+    connectWS();
+    if (!navigator.xr) { noArMsg.style.display='block'; noArMsg.textContent='WebXR non disponibile. Usa Chrome su Android con ARCore.'; return; }
+    const ok = await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
+    if (!ok) { noArMsg.style.display='block'; noArMsg.textContent='AR non supportata su questo dispositivo.'; return; }
+    try {
+      const xrSession = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+      });
+      renderer.xr.setReferenceSpaceType('local');
+      await renderer.xr.setSession(xrSession);
+      introEl.style.display = 'none';
+      renderer.setAnimationLoop(onXRFrame);
+    } catch(e) { noArMsg.style.display='block'; noArMsg.textContent='Errore AR: '+e.message; }
+  });
+
+  // ── UI Controls ──────────────────────────────────────────────────
+  swatches.forEach(s => {
+    s.addEventListener('click', () => {
+      swatches.forEach(x => x.classList.remove('active'));
+      s.classList.add('active');
+      sprayColorHex = s.dataset.hex;
+    });
+  });
+
+  bgDots.forEach(d => {
+    if (!d.id) d.addEventListener('click', () => {
+      bgDots.forEach(x => x.classList.remove('active'));
+      d.classList.add('active');
+      if (ws && ws.readyState===1) ws.send(JSON.stringify({ type:'bg', color:d.dataset.bg }));
+    });
+  });
+
+  sizeSlider.addEventListener('input', () => { spraySize = parseFloat(sizeSlider.value); });
+
+  const bgUploadBtn = document.getElementById('bg-upload-btn');
+  const bgFileInput = document.getElementById('bg-file-input');
+  bgUploadBtn.addEventListener('click', () => bgFileInput.click());
+  bgFileInput.addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim=1280, scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+        const cv=document.createElement('canvas');
+        cv.width=Math.round(img.width*scale); cv.height=Math.round(img.height*scale);
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        bgDots.forEach(d=>d.classList.remove('active'));
+        bgUploadBtn.classList.add('active');
+        if (ws&&ws.readyState===1) ws.send(JSON.stringify({ type:'bg-image', data:cv.toDataURL('image/jpeg',0.8) }));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function startSpray() { if (!calibrating) { spraying=true; sprayBtn.classList.add('active'); } }
+  function stopSpray()  { spraying=false; sprayBtn.classList.remove('active'); sprayPressure=0; }
+  sprayBtn.addEventListener('touchstart', e => { e.preventDefault(); startSpray(); }, { passive:false });
+  sprayBtn.addEventListener('touchend',   e => { e.preventDefault(); stopSpray();  }, { passive:false });
+  sprayBtn.addEventListener('mousedown',  startSpray);
+  sprayBtn.addEventListener('mouseup',    stopSpray);
+  sprayBtn.addEventListener('mouseleave', stopSpray);
+
+  clearBtn.addEventListener('click', () => {
+    if (ws && ws.readyState===1) ws.send(JSON.stringify({ type:'clear' }));
+  });
+
+  // ── Save modal ───────────────────────────────────────────────────
+  function seededRand(seed) { let s=seed; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; }
+
+  function openSaveModal() {
+    // Genera preview del graffito con il seed del codice sessione
+    const canvas = document.getElementById('save-canvas');
+    canvas.width=320; canvas.height=240;
+    const ctx=canvas.getContext('2d');
+    const seed=Array.from(sessionCode).reduce((a,c)=>a+c.charCodeAt(0),0);
+    const r=seededRand(seed);
+    ctx.fillStyle=`hsl(${Math.floor(r()*360)},${Math.floor(r()*15)}%,${Math.floor(r()*6)+3}%)`;
+    ctx.fillRect(0,0,320,240);
+    const colors=['#ff3b3b','#0a84ff','#bf5af2','#ff9f0a','#30d158','#ffd60a'];
+    for(let i=0;i<Math.floor(r()*4+3);i++){
+      const cx=r()*320,cy=r()*240,rad=r()*70+15;
+      const c=colors[Math.floor(r()*colors.length)];
+      const ri=parseInt(c.slice(1,3),16),gi=parseInt(c.slice(3,5),16),bi=parseInt(c.slice(5,7),16);
+      const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,rad);
+      grd.addColorStop(0,`rgba(${ri},${gi},${bi},${r()*0.55+0.25})`);
+      grd.addColorStop(1,`rgba(${ri},${gi},${bi},0)`);
+      ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.fillStyle=grd;ctx.fill();
+      for(let j=0;j<40;j++){const a=r()*Math.PI*2,d=r()*rad;ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,cy+Math.sin(a)*d,r()*2+0.2,0,Math.PI*2);ctx.fillStyle=`rgba(${ri},${gi},${bi},${r()*0.4+0.1})`;ctx.fill();}
+    }
+
+    document.getElementById('save-code').textContent = sessionCode;
+    document.getElementById('save-link').href = `download.html?code=${sessionCode}`;
+    document.getElementById('save-modal').classList.add('open');
+  }
+
+  window.openSaveModal = openSaveModal;
+  window.closeSaveModal = () => document.getElementById('save-modal').classList.remove('open');
+
+  // Mostra save btn anche senza calibrazione dopo primo spray
+  let everSprayed = false;
+  const origSendSpray = sendSpray;
+
+})();
+</script>
+</body>
+</html>

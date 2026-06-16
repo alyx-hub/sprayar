@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Il tuo graffito · Digital Graffiti</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+:root {
+  --black:#080808;--white:#f5f4f0;--spray:#ff3b3b;
+  --dim:rgba(245,244,240,0.1);--dim2:rgba(245,244,240,0.04);
+  --mono:'Space Mono',monospace;--sans:'Space Grotesk',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:var(--black);color:var(--white);font-family:var(--sans);min-height:100svh;cursor:none;}
+#cursor{position:fixed;width:10px;height:10px;border-radius:50%;background:var(--spray);pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .15s,height .15s;}
+#cursor.big{width:36px;height:36px;}
+@media(hover:none){#cursor{display:none;}body{cursor:auto;}}
+
+/* NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;
+  border-bottom:0.5px solid var(--dim);
+  background:rgba(8,8,8,0.88);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+}
+.nav-logo{display:flex;align-items:center;color:var(--white);text-decoration:none;}
+.nav-logo svg{width:80px;height:auto;}
+.nav-back{
+  font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;
+  color:rgba(245,244,240,0.38);text-decoration:none;
+  display:flex;align-items:center;gap:8px;transition:color .2s;
+}
+.nav-back:hover{color:var(--white);}
+.nav-back::before{content:'←';}
+
+/* MAIN */
+main{
+  min-height:100svh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:100px 24px 56px;
+}
+
+/* STATI */
+.state{display:none;flex-direction:column;align-items:center;text-align:center;gap:24px;width:100%;max-width:440px;}
+.state.active{display:flex;}
+
+.state-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(245,244,240,0.28);}
+.state-title{font-size:clamp(28px,6vw,40px);font-weight:700;letter-spacing:-0.025em;line-height:1.05;}
+.state-sub{font-size:13px;color:rgba(245,244,240,0.42);line-height:1.68;font-weight:300;max-width:340px;}
+
+/* PREVIEW */
+.preview-frame{
+  width:100%;max-width:380px;aspect-ratio:4/3;
+  border:0.5px solid var(--dim);background:var(--dim2);
+  position:relative;overflow:hidden;
+}
+.preview-frame canvas{width:100%;height:100%;display:block;}
+
+.preview-meta{width:100%;max-width:380px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;text-align:left;}
+.preview-info{display:flex;flex-direction:column;gap:4px;}
+.preview-label{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(245,244,240,0.25);}
+.preview-name{font-size:20px;font-weight:700;letter-spacing:-0.01em;}
+.preview-date{font-family:var(--mono);font-size:10px;color:rgba(245,244,240,0.28);margin-top:2px;}
+
+/* PROGRESS */
+.progress-wrap{width:100%;max-width:380px;}
+.progress-header{display:flex;justify-content:space-between;margin-bottom:10px;}
+.progress-label{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(245,244,240,0.3);}
+.progress-pct{font-family:var(--mono);font-size:9px;color:var(--spray);}
+.progress-bar{height:1px;background:var(--dim);overflow:hidden;}
+.progress-fill{height:100%;background:var(--spray);width:0%;transition:width .08s linear;}
+
+/* SUCCESS */
+.success-check{
+  width:64px;height:64px;border-radius:50%;
+  border:1.5px solid rgba(48,209,88,0.4);
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;color:#30d158;
+  animation:pop .4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes pop{from{transform:scale(0);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+/* BUTTONS */
+.btn-primary{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--black);background:var(--white);padding:14px 32px;border-radius:2px;
+  border:none;cursor:pointer;text-decoration:none;
+  transition:opacity .2s,transform .15s;white-space:nowrap;
+}
+.btn-primary:hover{opacity:0.86;transform:translateY(-1px);}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--white);background:transparent;padding:13px 32px;border-radius:2px;
+  border:0.5px solid var(--dim);cursor:pointer;text-decoration:none;
+  transition:border-color .2s,transform .15s;white-space:nowrap;
+}
+.btn-ghost:hover{border-color:rgba(245,244,240,0.38);transform:translateY(-1px);}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+
+@media(max-width:480px){
+  nav{padding:12px 16px;}
+  .nav-logo svg{width:68px;}
+  main{padding:80px 16px 40px;}
+  .btn-row{flex-direction:column;align-items:stretch;}
+  .btn-primary,.btn-ghost{justify-content:center;}
+}
+</style>
+</head>
+<body>
+<div id="cursor"></div>
+
+<nav>
+  <a href="index.html" class="nav-logo"><svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="140" height="127" viewBox="0 0 1357.000000 1230.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,1230.000000) scale(0.100000,-0.100000)"
+fill="currentColor" stroke="none">
+<path d="M5370 11905 l0 -395 -395 0 -395 0 0 -395 0 -395 393 2 392 3 3 393
+2 392 390 0 390 0 0 395 0 395 -390 0 -390 0 0 -395z"/>
+<path d="M1357 11613 c-4 -3 -7 -552 -7 -1220 l0 -1213 1220 0 1220 0 0 1220
+0 1220 -1213 0 c-668 0 -1217 -3 -1220 -7z"/>
+<path d="M6150 10330 l0 -390 395 0 395 0 0 390 0 390 -395 0 -395 0 0 -390z"/>
+<path d="M4580 9545 l0 -395 395 0 395 0 0 -395 0 -395 390 0 390 0 0 395 0
+395 -390 0 -390 0 -2 393 -3 392 -392 3 -393 2 0 -395z"/>
+<path d="M0 4200 l0 -4190 2370 0 2370 0 0 400 0 400 -1970 0 -1970 0 2 3393
+3 3392 1968 3 1967 2 0 395 0 395 -2370 0 -2370 0 0 -4190z"/>
+<path d="M5005 6810 c-131 -14 -262 -57 -373 -121 -80 -48 -238 -208 -287
+-293 -154 -267 -196 -614 -114 -941 63 -253 246 -480 472 -585 114 -54 206
+-72 362 -73 239 -1 363 45 515 190 50 47 92 84 94 82 2 -2 11 -55 21 -116 l18
+-113 133 0 134 0 0 520 0 520 -400 0 -400 0 0 -165 0 -165 221 0 221 0 -6 -37
+c-11 -59 -69 -173 -114 -224 -105 -117 -270 -173 -442 -149 -136 19 -284 108
+-355 213 -79 116 -117 327 -96 541 20 214 62 325 166 435 112 118 212 156 389
+149 125 -6 190 -26 268 -83 59 -43 94 -89 124 -162 l23 -58 195 -3 c224 -3
+208 -11 181 93 -36 137 -119 267 -232 360 -178 147 -438 215 -718 185z"/>
+<path d="M1610 5805 l0 -966 488 4 c433 3 494 5 552 22 218 61 358 180 466
+400 92 187 132 404 120 645 -19 386 -159 652 -410 775 -153 75 -165 77 -723
+82 l-493 5 0 -967z m918 610 c119 -28 182 -79 231 -184 53 -115 65 -191 65
+-406 -1 -163 -4 -201 -22 -268 -47 -170 -134 -291 -249 -345 -57 -26 -61 -27
+-305 -30 l-248 -4 0 626 0 626 233 0 c170 0 249 -4 295 -15z"/>
+<path d="M3510 5805 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+<path d="M6330 5805 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+<path d="M6950 6600 l0 -170 285 0 285 0 0 -795 0 -795 205 0 205 0 0 795 0
+795 285 0 285 0 0 170 0 170 -775 0 -775 0 0 -170z"/>
+<path d="M8752 5813 c-188 -527 -342 -961 -342 -965 0 -5 93 -8 208 -8 l207 0
+66 198 65 197 354 0 354 0 13 -35 c6 -19 36 -108 64 -197 l52 -163 218 0 219
+0 -44 123 c-24 67 -177 501 -341 965 l-298 842 -227 0 -227 0 -341 -957z m686
+131 l119 -369 -240 -3 c-132 -1 -242 0 -244 2 -3 3 50 171 118 375 68 203 125
+369 126 367 1 -1 56 -168 121 -372z"/>
+<path d="M10477 6764 c-4 -4 -7 -439 -7 -966 l0 -958 685 0 685 0 0 175 0 175
+-480 0 -480 0 -2 788 -3 787 -196 3 c-107 1 -198 -1 -202 -4z"/>
+<path d="M2350 3605 c-8 -2 -49 -9 -90 -15 -385 -62 -667 -378 -730 -815 -12
+-90 -12 -300 0 -390 36 -250 121 -418 293 -581 93 -88 220 -161 332 -189 145
+-37 353 -37 485 1 100 29 190 84 277 171 46 44 83 80 83 80 0 -1 9 -54 20
+-117 11 -63 20 -116 20 -118 0 -1 60 -1 133 0 l132 3 0 515 0 515 -400 0 -400
+0 -3 -157 -3 -158 226 0 c124 0 225 -4 225 -8 0 -21 -35 -122 -57 -166 -31
+-61 -114 -150 -171 -183 -73 -43 -155 -63 -255 -63 -106 0 -167 14 -253 58
+-183 92 -269 254 -281 527 -15 332 70 559 253 680 86 57 160 78 279 77 213 0
+362 -93 422 -263 l18 -49 197 0 c109 0 198 4 198 8 0 5 -9 43 -19 84 -52 204
+-188 367 -386 463 -101 49 -171 69 -295 84 -77 10 -213 13 -250 6z"/>
+<path d="M3700 2596 l0 -966 195 0 195 0 0 381 0 381 258 -4 c253 -3 258 -3
+313 -29 46 -22 60 -35 77 -70 30 -62 42 -152 42 -310 0 -132 20 -291 41 -330
+9 -18 22 -19 227 -17 199 3 217 4 220 21 2 10 -11 34 -28 53 -17 20 -36 48
+-42 63 -6 14 -14 136 -18 271 -7 215 -10 253 -30 308 -26 73 -91 147 -160 182
+l-44 23 55 27 c146 74 233 240 232 440 -2 251 -157 454 -394 516 -55 15 -138
+18 -601 21 l-538 4 0 -965z m971 614 c98 -27 151 -105 158 -228 6 -127 -32
+-206 -118 -246 -43 -20 -65 -21 -333 -24 l-288 -3 0 255 0 256 273 0 c151 0
+288 -5 308 -10z"/>
+<path d="M6167 3547 c-39 -101 -677 -1898 -677 -1906 0 -8 59 -11 208 -9 l207
+3 64 198 65 197 355 -2 355 -3 64 -197 64 -198 214 0 c162 0 214 3 214 12 0 7
+-152 441 -337 965 l-337 953 -227 0 c-178 0 -228 -3 -232 -13z m347 -803 c64
+-198 116 -366 116 -372 0 -9 -64 -12 -240 -12 -132 0 -240 3 -240 7 0 13 241
+745 245 741 2 -1 55 -165 119 -364z"/>
+<path d="M7550 2595 l0 -965 200 0 200 0 0 405 0 405 425 0 425 0 0 170 0 170
+-425 0 -425 0 0 220 0 220 485 0 485 0 0 170 0 170 -685 0 -685 0 0 -965z"/>
+<path d="M9185 3548 c-3 -7 -4 -440 -3 -963 l3 -950 198 -3 197 -2 0 405 0
+405 430 0 430 0 -2 168 -3 167 -428 3 -427 2 2 218 3 217 488 3 487 2 -2 168
+-3 167 -683 3 c-541 2 -684 0 -687 -10z"/>
+<path d="M10790 2595 l0 -965 195 0 195 0 0 965 0 965 -195 0 -195 0 0 -965z"/>
+<path d="M11400 3390 l0 -170 290 0 290 0 0 -795 0 -795 200 0 200 0 0 795 0
+795 290 0 290 0 0 170 0 170 -780 0 -780 0 0 -170z"/>
+<path d="M13160 2595 l0 -965 200 0 200 0 0 965 0 965 -200 0 -200 0 0 -965z"/>
+</g>
+</svg></a>
+  <a href="index.html" class="nav-back">Home</a>
+</nav>
+
+<main>
+  <!-- Stato 1: preview opera (viene aperto dopo QR scan) -->
+  <div class="state active" id="state-preview">
+    <div class="state-eyebrow">La tua opera</div>
+    <div class="preview-frame">
+      <canvas id="preview-canvas"></canvas>
+    </div>
+    <div class="preview-meta">
+      <div class="preview-info">
+        <span class="preview-label">Autore</span>
+        <span class="preview-name" id="preview-name">Visitatore #247</span>
+        <span class="preview-date" id="preview-date"></span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="startDownload()">↓ Scarica</button>
+      <a href="gallery.html" class="btn-ghost">Galleria →</a>
+    </div>
+  </div>
+
+  <!-- Stato 2: download in corso -->
+  <div class="state" id="state-downloading">
+    <div class="state-eyebrow">Download in corso</div>
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span class="progress-label">Preparazione file</span>
+        <span class="progress-pct" id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- Stato 3: completato -->
+  <div class="state" id="state-done">
+    <div class="success-check">✓</div>
+    <h1 class="state-title">Salvato</h1>
+    <p class="state-sub">L'opera è nella tua galleria foto. Vuoi aggiungerla all'esposizione?</p>
+    <div class="btn-row">
+      <a href="gallery.html?add=true" class="btn-primary">+ Aggiungi alla galleria</a>
+      <a href="gallery.html" class="btn-ghost">Esplora le opere →</a>
+    </div>
+  </div>
+</main>
+
+<script>
+const cursor = document.getElementById('cursor');
+document.addEventListener('mousemove', e => { cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px'; });
+document.querySelectorAll('a,button').forEach(el => {
+  el.addEventListener('mouseenter', () => cursor.classList.add('big'));
+  el.addEventListener('mouseleave', () => cursor.classList.remove('big'));
+});
+
+function setState(id) {
+  document.querySelectorAll('.state').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function seededRand(seed) {
+  let s = seed;
+  return () => { s=(s*9301+49297)%233280; return s/233280; };
+}
+
+function generatePreview(seed) {
+  const canvas = document.getElementById('preview-canvas');
+  canvas.width = 380; canvas.height = 285;
+  const ctx = canvas.getContext('2d');
+  const r = seededRand(seed);
+  ctx.fillStyle = `hsl(${Math.floor(r()*360)},${Math.floor(r()*20)+2}%,${Math.floor(r()*6)+3}%)`;
+  ctx.fillRect(0,0,380,285);
+  const colors = ['#ff3b3b','#0a84ff','#bf5af2','#ff9f0a','#30d158','#ffd60a'];
+  for (let i=0;i<Math.floor(r()*5+3);i++) {
+    const cx=r()*380,cy=r()*285,rad=r()*80+20;
+    const c=colors[Math.floor(r()*colors.length)];
+    const ri=parseInt(c.slice(1,3),16),gi=parseInt(c.slice(3,5),16),bi=parseInt(c.slice(5,7),16);
+    const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,rad);
+    grd.addColorStop(0,`rgba(${ri},${gi},${bi},${r()*0.55+0.25})`);
+    grd.addColorStop(1,`rgba(${ri},${gi},${bi},0)`);
+    ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.fillStyle=grd;ctx.fill();
+    for(let j=0;j<50;j++){const a=r()*Math.PI*2,d=r()*rad;ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,cy+Math.sin(a)*d,r()*2+0.2,0,Math.PI*2);ctx.fillStyle=`rgba(${ri},${gi},${bi},${r()*0.4+0.1})`;ctx.fill();}
+  }
+}
+
+// Leggi parametri dal QR (URL params)
+const params = new URLSearchParams(location.search);
+const code = params.get('code') || 'DG-2025-0247';
+const num = parseInt(code.split('-').pop()) || 247;
+const seed = Array.from(code).reduce((a,c)=>a+c.charCodeAt(0),0);
+
+generatePreview(seed);
+document.getElementById('preview-name').textContent = `Visitatore #${num}`;
+document.getElementById('preview-date').textContent = new Date().toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});
+
+function startDownload() {
+  setState('state-downloading');
+  const fill = document.getElementById('progress-fill');
+  const pct  = document.getElementById('progress-pct');
+  let p = 0;
+  const iv = setInterval(() => {
+    p += Math.random()*10+3;
+    if (p >= 100) {
+      p=100; clearInterval(iv);
+      setTimeout(() => {
+        const canvas = document.getElementById('preview-canvas');
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = `digital-graffiti-${num}.png`;
+        a.click();
+        setState('state-done');
+      }, 300);
+    }
+    fill.style.width = p+'%';
+    pct.textContent = Math.floor(p)+'%';
+  }, 70);
+}
+</script>
+</body>
+</html>
